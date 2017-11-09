@@ -1,28 +1,34 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 
-public class Sperm : MonoBehaviour
+public class Sperm : Photon.PunBehaviour
 {
     [SerializeField]
+    private Text EndGameText;
     private GameObject Egg;
     private GameManager Manager;
 
     private Animator TailAnimator { get; set; }
-    private Rigidbody2D rb;
+    public Rigidbody2D rb;
     private bool Impregnating;
 
     private float initialOrientationX;
     private float initialOrientationY;
     private float initialOrientationZ;
 
-    private Vector3 CameraPosition
+    private PhotonView pView;
+
+    public static Sperm main;
+    private Transform _cameraTransform;
+    private Vector3 CameraPosition //TODO: Every object must spawn their own cameras. You have to work on that
     {
         get
         {
-            return Camera.main.transform.position;
+            return _cameraTransform.position;
         }
         set
         {
-            Camera.main.transform.position = value;
+            _cameraTransform.position = value;
         }
     }
 
@@ -33,35 +39,49 @@ public class Sperm : MonoBehaviour
         Right = 2
     }
 
+    private void Awake()
+    {
+        if (photonView.isMine)
+            Sperm.main = this;
+    }
+
     // Use this for initialization
     void Start()
     {
+        if (_cameraTransform == null) _cameraTransform = Camera.main.transform;
         Input.gyro.enabled = true;
+        Egg = GameObject.FindGameObjectWithTag("Food");
         Manager = GameManager.GetManager().GetComponent<GameManager>();
         TailAnimator = transform.GetChild(0).GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
+        pView = GetComponent<PhotonView>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        TailAnimator.speed = rb.velocity.magnitude;
-        CameraPosition = Vector3.Lerp(CameraPosition, new Vector3(0, transform.position.y, -10), Time.deltaTime * 8);
-        float pos_y = Mathf.Clamp(CameraPosition.y, 9, Egg.transform.position.y - 10);
-        if(Manager.GameStarted)
+        if (pView.isMine)
         {
-            if(Input.gyro.rotationRateUnbiased.z < -0.05f || Input.gyro.rotationRateUnbiased.z > 0.05f)
+            TailAnimator.speed = rb.velocity.magnitude;
+            CameraPosition = Vector3.Lerp(CameraPosition, new Vector3(0, transform.position.y, -10), Time.deltaTime * 8);
+            float pos_y = Mathf.Clamp(CameraPosition.y, 9, Egg.transform.position.y - 10);
+            if (Manager.GameStarted)
             {
-                transform.Rotate(0, 0, Input.gyro.rotationRateUnbiased.z);
-                Debug.Log(Input.gyro.rotationRateUnbiased.z);                
+                if (Input.gyro.rotationRateUnbiased.z < -0.05f || Input.gyro.rotationRateUnbiased.z > 0.05f)
+                {
+                    transform.Rotate(0, 0, Input.gyro.rotationRateUnbiased.z);
+                }
             }
+            CameraPosition = new Vector3(CameraPosition.x, pos_y, -10);
         }
-        CameraPosition = new Vector3(CameraPosition.x, pos_y, -10);
     }
-
+    
     public void Wiggle()
-    {        
-        rb.velocity += new Vector2(transform.up.x, transform.up.y);
+    {
+        if (pView.isMine)
+        {
+            rb.velocity += new Vector2(Sperm.main.transform.up.x, Sperm.main.transform.up.y);
+        }
     }
 
     public void ThrowSperm(int shakeCount)
@@ -79,8 +99,10 @@ public class Sperm : MonoBehaviour
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
+        rb.angularVelocity = 0;
         if (Impregnating) //WIN THE GAME
         {
+            EndGameText.gameObject.SetActive(true);
             Destroy(GetComponent<Sperm>());
             FindObjectOfType<GameManager>().EndGame();
         }

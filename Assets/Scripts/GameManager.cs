@@ -1,36 +1,28 @@
 ﻿using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
-public class GameManager : MonoBehaviour
+public class GameManager : Photon.PunBehaviour
 {
     [SerializeField]
-    private Text EndGameText;
-    [SerializeField]
-    private Button Start, Exit, ShakeIt;
-    [SerializeField]
-    private Button[] PushButtons;
-    private static GameObject MyObject;
+    private GameObject Sperm;
+    public static GameManager MyObject;
 
     public bool GameStarted = false;
 
     private void Awake()
     {
-        MyObject = gameObject;
+        DontDestroyOnLoad(gameObject);
+        MyObject = this;
     }
 
-    public static GameObject GetManager()
+    public static GameManager GetManager()
     {
         return MyObject;
     }
 
     public void StartGame()
     {
-        ShakeIt.gameObject.SetActive(false);
-        foreach (var item in PushButtons)
-        {
-            item.gameObject.SetActive(true);
-        }
+
     }
 
     public void InitGame()
@@ -40,18 +32,45 @@ public class GameManager : MonoBehaviour
 
     public void EndGame()
     {
-        EndGameText.gameObject.SetActive(true);
-        Exit.gameObject.SetActive(true);
-        Start.gameObject.SetActive(true);
-        foreach (var item in PushButtons)
-        {
-            item.gameObject.SetActive(false);
-        }
+
     }
 
     public void StartButton()
     {
+        PhotonNetwork.ConnectUsingSettings("OMG");
+    }
+
+    public virtual void OnConnectedToMaster()
+    {
+        PhotonNetwork.JoinLobby();
+    }
+
+    public virtual void OnJoinedLobby()
+    {
+        Debug.Log(PhotonNetwork.connectionStateDetailed.ToString());
+        PhotonNetwork.JoinOrCreateRoom("RandomRoomName", null, null);
+    }
+
+    public virtual void OnJoinedRoom()
+    {
+        Debug.Log(PhotonNetwork.connectionStateDetailed.ToString());
         SceneManager.LoadScene(1);
+    }
+
+    public void OnLevelWasLoaded(int level)
+    {        
+        if (PhotonNetwork.countOfPlayers == 2)
+        {
+            Debug.Log("Spawning new player!");
+            photonView.RPC("InitiateGame", PhotonTargets.All);
+        }
+    }
+
+    [PunRPC]
+    void InitiateGame()
+    {
+        Transform spawnPoint = GameObject.Find("SpawnPoint").transform;
+        PhotonNetwork.Instantiate("PlayerSperm", spawnPoint.position, Quaternion.identity, 0);
     }
 
     public void ExitButton()
